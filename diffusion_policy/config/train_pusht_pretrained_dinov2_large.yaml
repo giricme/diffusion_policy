@@ -2,7 +2,7 @@ defaults:
   - _self_
   - task: pusht_image
 
-name: pusht_resnet_pretrained_dinov2_base
+name: pusht_pretrained_dinov2_large
 _target_: diffusion_policy.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
 
 task_name: ${task.name}
