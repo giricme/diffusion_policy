@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torchvision
 import transformers
+from transformers import AutoImageProcessor
 
 from diffusion_policy.common.pytorch_util import dict_apply, replace_submodules
 from diffusion_policy.model.common.module_attr_mixin import ModuleAttrMixin
@@ -24,7 +25,8 @@ class MultiImageObsEncoder(ModuleAttrMixin):
             share_rgb_model: bool=False,
             # renormalize rgb input with imagenet normalization
             # assuming input in [0,1]
-            imagenet_norm: bool=False
+            imagenet_norm: bool=False,
+            rgb_model_name: str=None,
         ):
         """
         Assumes rgb input: B,C,H,W
@@ -126,6 +128,13 @@ class MultiImageObsEncoder(ModuleAttrMixin):
         self.rgb_keys = rgb_keys
         self.low_dim_keys = low_dim_keys
         self.key_shape_map = key_shape_map
+        self.rgb_model_name = rgb_model_name
+        self.predefined_image_processor = None
+        if (
+            self.rgb_model_name == "facebook/dinov2-base"
+            or self.rgb_model_name == "facebook/dinov2-large"
+        ):
+            self.predefined_image_processor = AutoImageProcessor.from_pretrained(self.rgb_model_name)
 
     def forward(self, obs_dict):
         batch_size = None
@@ -146,8 +155,16 @@ class MultiImageObsEncoder(ModuleAttrMixin):
             # (N*B,C,H,W)
             imgs = torch.cat(imgs, dim=0)
             # (N*B,D)
-            if isinstance(self.key_model_map['rgb'], transformers.models.dinov2.modeling_dinov2.Dinov2Model):
-                feature = self.key_model_map["rgb"](imgs)[0].mean(dim=1)
+            if (
+                self.rgb_model_name == "facebook/dinov2-base"
+                or self.rgb_model_name == "facebook/dinov2-large"
+            ):
+                imgs = (imgs * 255).type(torch.uint8)
+                inputs = self.predefined_image_processor(
+                    images=imgs, return_tensors="pt"
+                )
+                outputs = self.key_model_map["rgb"](**inputs)
+                feature = outputs[0].mean(dim=1)
             else:
                 feature = self.key_model_map["rgb"](imgs)
             # (N,B,D)
