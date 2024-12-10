@@ -161,8 +161,10 @@ class MultiImageObsEncoder(ModuleAttrMixin):
             ):
                 imgs = (imgs * 255).type(torch.uint8)
                 inputs = self.predefined_image_processor(
-                    images=imgs, return_tensors="pt"
+                    images=imgs, 
+                    return_tensors="pt",
                 )
+                inputs['pixel_values'] = inputs['pixel_values'].to(self.device)
                 outputs = self.key_model_map["rgb"](**inputs)
                 feature = outputs[0].mean(dim=1)
             else:
